@@ -1,0 +1,26 @@
+name: Deploy Prometheus Config
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "prometheus.yml"
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # Change to ubuntu-latest if using GitHub-hosted runners
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
+
+      - name: Run Ansible Playbook
+        run: |
+          cd playbooks
+          ansible-playbook -i inventory.ini deploy_prometheus.yml

@@ -1,0 +1,36 @@
+---
+- name: Deploy Prometheus Configuration
+  hosts: 192.168.0.104
+  become: true
+  remote_user: baborok
+
+  tasks:
+    - name: Install required dependencies
+      apt:
+        name: git
+        state: present
+      become: true
+
+    - name: Clone Prometheus Config Repository
+      git:
+        repo: "https://github.com/baborok/Prometheus-config.git"
+        dest: "/home/baborok/prometheus-config"
+        version: master
+        force: yes
+
+    - name: Copy Prometheus Configuration to /etc/prometheus/
+      copy:
+        src: "/home/baborok/prometheus-config/prometheus.yml"
+        dest: "/etc/prometheus/prometheus.yml"
+        owner: root
+        group: root
+        mode: '0644'
+        remote_src: yes  # ✅ Fix: File exists on remote, not on Ansible controller
+      become: true
+
+    - name: Restart Prometheus Service
+      systemd:
+        name: prometheus
+        state: restarted
+        enabled: yes
+      become: true
