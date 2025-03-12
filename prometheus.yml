@@ -35,5 +35,10 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9798']
 
+  - job_name: 'test'
+    scrape_interval: 5s
+    scrape_timeout: 1m
+    static_configs:
+      - targets: ['localhost:9100']
 
 
