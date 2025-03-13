@@ -1,0 +1,4 @@
+- labels:
+    job: 'test'
+  targets:
+    - 'localhost:9100'

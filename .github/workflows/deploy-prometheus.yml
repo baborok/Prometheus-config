@@ -1,11 +1,13 @@
-name: Deploy Prometheus Config
+name: Deploy Prometheus Configuration
 
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - "prometheus.yml"
+      - "rules/**"
+      - "jobs/**"
 
 jobs:
   deploy:

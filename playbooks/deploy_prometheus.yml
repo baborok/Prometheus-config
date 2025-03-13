@@ -18,14 +18,39 @@
         version: master
         force: yes
 
-    - name: Copy Prometheus Configuration to /etc/prometheus/
+    - name: Ensure Prometheus configuration directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/prometheus/rules
+        - /etc/prometheus/jobs
+
+    - name: Copy Prometheus Configuration
       copy:
         src: "/home/baborok/prometheus-config/prometheus.yml"
         dest: "/etc/prometheus/prometheus.yml"
         owner: root
         group: root
         mode: '0644'
-        remote_src: yes  # ✅ Fix: File exists on remote, not on Ansible controller
+        remote_src: yes
+      become: true
+
+    - name: Copy Alert Rules
+      synchronize:
+        src: "/home/baborok/prometheus-config/rules/"
+        dest: "/etc/prometheus/rules/"
+        recursive: yes
+      become: true
+
+    - name: Copy Job Targets
+      synchronize:
+        src: "/home/baborok/prometheus-config/jobs/"
+        dest: "/etc/prometheus/jobs/"
+        recursive: yes
       become: true
 
     - name: Restart Prometheus Service

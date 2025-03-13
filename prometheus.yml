@@ -1,44 +1,25 @@
-# my global config
+# Global Config
 global:
-  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
-  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
-  # scrape_timeout is set to the global default (10s).
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
-# Alertmanager configuration
+# Alertmanager Configuration
 alerting:
   alertmanagers:
     - static_configs:
-        - targets:
-          # - alertmanager:9093
+        - targets: []
 
-# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+# Load all rule files from /etc/prometheus/rules/
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  - "/etc/prometheus/rules/*.yml"
 
-# A scrape configuration containing exactly one endpoint to scrape:
-# Here it's Prometheus itself.
+# Scrape Configurations
 scrape_configs:
-  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: "prometheus"
-
-    # metrics_path defaults to '/metrics'
-    # scheme defaults to 'http'.
-
     static_configs:
       - targets: ["localhost:9090"]
 
-
-  - job_name: 'speedtest-exporter'
-    scrape_interval: 15m
-    scrape_timeout: 1m
-    static_configs:
-      - targets: ['localhost:9798']
-
-  - job_name: 'test'
-    scrape_interval: 5s
-    scrape_timeout: 1m
-    static_configs:
-      - targets: ['localhost:9100']
-
-
+# Include additional job configurations from /etc/prometheus/jobs/
+  - file_sd_configs:
+      - files:
+          - "/etc/prometheus/jobs/*.yml"
