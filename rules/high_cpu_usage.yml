@@ -8,11 +8,3 @@ groups:
           severity: warning
         annotations:
           summary: "High CPU usage detected"
-
-      - alert: Highmemory
-        expr: node_cpu_seconds_total{mode="idle"} < 35
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High Memory usage detected"
