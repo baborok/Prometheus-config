@@ -9,7 +9,6 @@
       apt:
         name: git
         state: present
-      become: true
 
     - name: Clone Prometheus Config Repository
       git:
@@ -26,8 +25,14 @@
         group: root
         mode: '0755'
       loop:
+        - /etc/prometheus
         - /etc/prometheus/rules
         - /etc/prometheus/jobs
+
+    - name: Check if Prometheus configuration exists in repo
+      stat:
+        path: "/home/baborok/prometheus-config/prometheus.yml"
+      register: prometheus_config
 
     - name: Copy Prometheus Configuration
       copy:
@@ -37,25 +42,38 @@
         group: root
         mode: '0644'
         remote_src: yes
-      become: true
+      when: prometheus_config.stat.exists
+      notify: Restart Prometheus
 
-    - name: Copy Alert Rules
+    - name: Check if rules directory exists in repo
+      stat:
+        path: "/home/baborok/prometheus-config/rules/"
+      register: rules_dir
+
+    - name: Copy Alert Rules if directory exists
       synchronize:
         src: "/home/baborok/prometheus-config/rules/"
         dest: "/etc/prometheus/rules/"
         recursive: yes
-      become: true
+      when: rules_dir.stat.exists
+      notify: Restart Prometheus
 
-    - name: Copy Job Targets
+    - name: Check if jobs directory exists in repo
+      stat:
+        path: "/home/baborok/prometheus-config/jobs/"
+      register: jobs_dir
+
+    - name: Copy Job Targets if directory exists
       synchronize:
         src: "/home/baborok/prometheus-config/jobs/"
         dest: "/etc/prometheus/jobs/"
         recursive: yes
-      become: true
+      when: jobs_dir.stat.exists
+      notify: Restart Prometheus
 
-    - name: Restart Prometheus Service
+  handlers:
+    - name: Restart Prometheus
       systemd:
         name: prometheus
         state: restarted
         enabled: yes
-      become: true
