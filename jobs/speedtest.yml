@@ -1,5 +1,5 @@
 - labels:
-    job: 'speedtest-exporter'
+    job: 'rowdog-exporter'
   targets:
     - 'localhost:9798'
 
