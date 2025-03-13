@@ -10,12 +10,13 @@
         name: git
         state: present
 
-    - name: Clone Prometheus Config Repository
-      git:
-        repo: "https://github.com/baborok/Prometheus-config.git"
-        dest: "/home/baborok/prometheus-config"
-        version: master
-        force: yes
+    - name: Ensure Prometheus config repo is cloned on the target machine
+      command: >
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null baborok@192.168.0.104
+        'git clone --depth=1 git@github.com:baborok/Prometheus-config.git /home/baborok/prometheus-config || 
+        (cd /home/baborok/prometheus-config && git pull)'
+      args:
+        creates: /home/baborok/prometheus-config
 
     - name: Ensure Prometheus configuration directories exist
       file:
@@ -29,11 +30,6 @@
         - /etc/prometheus/rules
         - /etc/prometheus/jobs
 
-    - name: Check if Prometheus configuration exists in repo
-      stat:
-        path: "/home/baborok/prometheus-config/prometheus.yml"
-      register: prometheus_config
-
     - name: Copy Prometheus Configuration
       copy:
         src: "/home/baborok/prometheus-config/prometheus.yml"
@@ -42,33 +38,26 @@
         group: root
         mode: '0644'
         remote_src: yes
-      when: prometheus_config.stat.exists
       notify: Restart Prometheus
 
-    - name: Check if rules directory exists in repo
-      stat:
-        path: "/home/baborok/prometheus-config/rules/"
-      register: rules_dir
-
-    - name: Copy Alert Rules if directory exists
-      synchronize:
+    - name: Copy Alert Rules
+      copy:
         src: "/home/baborok/prometheus-config/rules/"
         dest: "/etc/prometheus/rules/"
-        recursive: yes
-      when: rules_dir.stat.exists
+        owner: root
+        group: root
+        mode: '0644'
+        remote_src: yes
       notify: Restart Prometheus
 
-    - name: Check if jobs directory exists in repo
-      stat:
-        path: "/home/baborok/prometheus-config/jobs/"
-      register: jobs_dir
-
-    - name: Copy Job Targets if directory exists
-      synchronize:
+    - name: Copy Job Targets
+      copy:
         src: "/home/baborok/prometheus-config/jobs/"
         dest: "/etc/prometheus/jobs/"
-        recursive: yes
-      when: jobs_dir.stat.exists
+        owner: root
+        group: root
+        mode: '0644'
+        remote_src: yes
       notify: Restart Prometheus
 
   handlers:
@@ -77,3 +66,4 @@
         name: prometheus
         state: restarted
         enabled: yes
+
