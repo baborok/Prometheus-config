@@ -3,7 +3,7 @@ name: Deploy Prometheus Configuration
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - "prometheus.yml"
       - "rules/**"
