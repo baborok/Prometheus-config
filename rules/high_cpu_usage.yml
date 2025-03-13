@@ -2,7 +2,7 @@ groups:
   - name: CPU Usage
     rules:
       - alert: HighCPUUsage
-        expr: node_cpu_seconds_total{mode="idle"} < 10
+        expr: node_cpu_seconds_total{mode="idle"} < 15
         for: 2m
         labels:
           severity: warning
