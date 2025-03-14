@@ -19,7 +19,7 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  - job_name: "dynamic_jobs"
+  - job_name: "dynamic_jobs_test"
     file_sd_configs:
       - files:
           - "/etc/prometheus/jobs/*.yml"
