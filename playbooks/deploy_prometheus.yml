@@ -1,6 +1,6 @@
 ---
 - name: Deploy Prometheus Configuration
-  hosts: 192.168.0.104
+  hosts: target_machine
   become: true
   remote_user: baborok
 
@@ -10,13 +10,13 @@
         name: git
         state: present
 
-    - name: Ensure Prometheus config repo is cloned on the target machine
-      command: >
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null baborok@192.168.0.104
-        'git clone --depth=1 git@github.com:baborok/Prometheus-config.git /home/baborok/prometheus-config || 
-        (cd /home/baborok/prometheus-config && git pull)'
-      args:
-        creates: /home/baborok/prometheus-config
+    - name: Clone or Update Prometheus Configuration Repository
+      git:
+        repo: "git@github.com:baborok/Prometheus-config.git"
+        dest: "/home/baborok/prometheus-config"
+        version: master
+        update: yes
+        force: yes  # Ensures local changes don't block updates
 
     - name: Ensure Prometheus configuration directories exist
       file:
@@ -66,4 +66,3 @@
         name: prometheus
         state: restarted
         enabled: yes
-
