@@ -11,7 +11,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Change to ubuntu-latest if using GitHub-hosted runners
+    runs-on: cock  # Change to ubuntu-latest if using GitHub-hosted runners
 
     steps:
       - name: Checkout Repository
