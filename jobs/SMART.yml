@@ -4,6 +4,6 @@
     - 'localhost:9798'
     
 - labels:
-    job: 'SMART-disk'
+    job: 'Postgres'
   targets:
-    - '192.168.0.103:9633'
+    - '192.168.0.121:9187'
