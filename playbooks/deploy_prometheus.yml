@@ -1,8 +1,7 @@
 ---
 - name: Deploy Prometheus Configuration
-  hosts: target_machine
+  hosts: localhost
   become: true
-  remote_user: baborok
 
   tasks:
     - name: Install required dependencies

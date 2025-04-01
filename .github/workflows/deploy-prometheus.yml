@@ -11,7 +11,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: cock  # Change to ubuntu-latest if using GitHub-hosted runners
+    runs-on: prom-machine #vajno tut sam host ne self-host inache beda budet
 
     steps:
       - name: Checkout Repository
@@ -20,9 +20,9 @@ jobs:
       - name: Set up Ansible
         run: |
           sudo apt update
-          sudo apt install -y ansible
+          sudo apt install -y ansible git
 
       - name: Run Ansible Playbook
         run: |
           cd playbooks
-          ansible-playbook -i inventory.ini deploy_prometheus.yml
+          ansible-playbook -i localhost, -c local deploy_prometheus.yml
