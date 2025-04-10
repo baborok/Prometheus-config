@@ -7,3 +7,8 @@
     job: 'Postgres'
   targets:
     - '192.168.0.121:9187'
+
+- labels:
+    job: 'JellyFinn'
+  targets:
+    - 'localhost:8096'
