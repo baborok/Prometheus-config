@@ -2,3 +2,5 @@
     job: 'biba'
   targets:
     - 'localhost:9100'
+  targets:
+    - 'localhost:8096'
