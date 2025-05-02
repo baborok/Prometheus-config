@@ -17,11 +17,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Ansible
-        run: |
-          sudo apt update
-          sudo apt install -y ansible git
-
       - name: Run Ansible Playbook
         run: |
           cd playbooks
