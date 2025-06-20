@@ -3,7 +3,7 @@ name: Validate Prometheus Configuration
 on:
   pull_request:
     branches:
-      - main
+      - master
     paths:
       - "prometheus.yml"
       - "rules/**"
