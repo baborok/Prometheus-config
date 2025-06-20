@@ -20,7 +20,7 @@ jobs:
     runs-on: prom-machine
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Install Prometheus tools (if not available)
         run: |
@@ -39,12 +39,21 @@ jobs:
         id: validate-main
         run: |
           echo "Validating prometheus.yml..."
-          if promtool check config prometheus.yml; then
+          
+          # Capture both stdout and stderr
+          if output=$(promtool check config prometheus.yml 2>&1); then
             echo "✅ prometheus.yml validation passed"
             echo "main_config_valid=true" >> $GITHUB_OUTPUT
+            echo "main_config_output<<EOF" >> $GITHUB_OUTPUT
+            echo "$output" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           else
             echo "❌ prometheus.yml validation failed"
             echo "main_config_valid=false" >> $GITHUB_OUTPUT
+            echo "main_config_output<<EOF" >> $GITHUB_OUTPUT
+            echo "$output" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "Error output: $output"
             exit 1
           fi
 
@@ -53,59 +62,83 @@ jobs:
         run: |
           echo "Validating alert rules..."
           rules_valid=true
+          all_rules_output=""
           
           if [ -d "rules" ]; then
             for rule_file in rules/*.yml rules/*.yaml; do
               if [ -f "$rule_file" ]; then
                 echo "Checking $rule_file..."
-                if promtool check rules "$rule_file"; then
+                if output=$(promtool check rules "$rule_file" 2>&1); then
                   echo "✅ $rule_file validation passed"
+                  all_rules_output="$all_rules_output✅ $rule_file: SUCCESS\n$output\n\n"
                 else
                   echo "❌ $rule_file validation failed"
+                  echo "Error output: $output"
                   rules_valid=false
+                  all_rules_output="$all_rules_output❌ $rule_file: FAILED\n$output\n\n"
                 fi
               fi
             done
           else
             echo "No rules directory found, skipping rule validation"
+            all_rules_output="No rules directory found"
           fi
           
           if [ "$rules_valid" = true ]; then
             echo "rules_valid=true" >> $GITHUB_OUTPUT
           else
             echo "rules_valid=false" >> $GITHUB_OUTPUT
+            echo "rules_output<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$all_rules_output" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             exit 1
           fi
+          
+          echo "rules_output<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$all_rules_output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Validate Job Configurations
         id: validate-jobs
         run: |
           echo "Validating job configurations..."
           jobs_valid=true
+          all_jobs_output=""
           
           if [ -d "jobs" ]; then
             # Check if job files are valid YAML
             for job_file in jobs/*.yml jobs/*.yaml; do
               if [ -f "$job_file" ]; then
                 echo "Checking YAML syntax for $job_file..."
-                if python3 -c "import yaml; yaml.safe_load(open('$job_file'))" 2>/dev/null; then
+                if output=$(python3 -c "import yaml; yaml.safe_load(open('$job_file'))" 2>&1); then
                   echo "✅ $job_file YAML syntax is valid"
+                  all_jobs_output="$all_jobs_output✅ $job_file: YAML syntax valid\n\n"
                 else
                   echo "❌ $job_file YAML syntax is invalid"
+                  echo "Error output: $output"
                   jobs_valid=false
+                  all_jobs_output="$all_jobs_output❌ $job_file: YAML syntax invalid\n$output\n\n"
                 fi
               fi
             done
           else
             echo "No jobs directory found, skipping job validation"
+            all_jobs_output="No jobs directory found"
           fi
           
           if [ "$jobs_valid" = true ]; then
             echo "jobs_valid=true" >> $GITHUB_OUTPUT
           else
             echo "jobs_valid=false" >> $GITHUB_OUTPUT
+            echo "jobs_output<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$all_jobs_output" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             exit 1
           fi
+          
+          echo "jobs_output<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$all_jobs_output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create validation summary
         if: always()
@@ -117,18 +150,37 @@ jobs:
             echo "✅ **Main Configuration**: prometheus.yml is valid" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Main Configuration**: prometheus.yml has errors" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Main Configuration Errors:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.validate-main.outputs.main_config_output }}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ steps.validate-rules.outputs.rules_valid }}" = "true" ]; then
             echo "✅ **Alert Rules**: All rule files are valid" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Alert Rules**: Some rule files have errors" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Alert Rules Details:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.validate-rules.outputs.rules_output }}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ steps.validate-jobs.outputs.jobs_valid }}" = "true" ]; then
             echo "✅ **Job Configurations**: All job files are valid" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Job Configurations**: Some job files have errors" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Job Configuration Details:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.validate-jobs.outputs.jobs_output }}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -141,7 +193,7 @@ jobs:
         if: always()
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}  # Explicitly use the GitHub token
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const mainValid = '${{ steps.validate-main.outputs.main_config_valid }}' === 'true';
             const rulesValid = '${{ steps.validate-rules.outputs.rules_valid }}' === 'true';
@@ -162,7 +214,31 @@ jobs:
             if (allValid) {
               body += '🎉 **All configurations are valid!** This PR is ready for review.\n';
             } else {
-              body += '⚠️ **Some configurations have validation errors.** Please check the workflow logs for details.\n';
+              body += '⚠️ **Some configurations have validation errors.** Please check the details below:\n\n';
+              
+              // Add main config errors
+              if (!mainValid) {
+                body += '### ❌ Main Configuration Errors:\n';
+                body += '```\n';
+                body += `${{ steps.validate-main.outputs.main_config_output }}`;
+                body += '\n```\n\n';
+              }
+              
+              // Add rules errors
+              if (!rulesValid) {
+                body += '### ❌ Alert Rules Errors:\n';
+                body += '```\n';
+                body += `${{ steps.validate-rules.outputs.rules_output }}`;
+                body += '\n```\n\n';
+              }
+              
+              // Add jobs errors
+              if (!jobsValid) {
+                body += '### ❌ Job Configuration Errors:\n';
+                body += '```\n';
+                body += `${{ steps.validate-jobs.outputs.jobs_output }}`;
+                body += '\n```\n\n';
+              }
             }
             
             body += '\n---\n';
