@@ -17,10 +17,10 @@ permissions:
 
 jobs:
   validate-config:
-    runs-on: beinfra-de
+    runs-on: prom-machine
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Prometheus tools (if not available)
         run: |
