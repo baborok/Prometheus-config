@@ -1,0 +1,176 @@
+name: Validate Prometheus Configuration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "prometheus.yml"
+      - "rules/**"
+      - "jobs/**"
+
+# Add permissions for the GITHUB_TOKEN
+permissions:
+  contents: read          # To checkout the repository
+  pull-requests: write    # To comment on pull requests
+  checks: write          # To create check runs (optional, for better status reporting)
+
+jobs:
+  validate-config:
+    runs-on: beinfra-de
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Prometheus tools (if not available)
+        run: |
+          # Check if promtool is available, if not install it
+          if ! command -v promtool &> /dev/null; then
+            echo "Installing Prometheus tools..."
+            PROM_VERSION="2.47.2"  # Update to latest version as needed
+            wget https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz
+            tar xvf prometheus-${PROM_VERSION}.linux-amd64.tar.gz
+            sudo cp prometheus-${PROM_VERSION}.linux-amd64/promtool /usr/local/bin/
+            rm -rf prometheus-${PROM_VERSION}*
+          fi
+          promtool --version
+
+      - name: Validate Prometheus main configuration
+        id: validate-main
+        run: |
+          echo "Validating prometheus.yml..."
+          if promtool check config prometheus.yml; then
+            echo "✅ prometheus.yml validation passed"
+            echo "main_config_valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ prometheus.yml validation failed"
+            echo "main_config_valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Validate Alert Rules
+        id: validate-rules
+        run: |
+          echo "Validating alert rules..."
+          rules_valid=true
+          
+          if [ -d "rules" ]; then
+            for rule_file in rules/*.yml rules/*.yaml; do
+              if [ -f "$rule_file" ]; then
+                echo "Checking $rule_file..."
+                if promtool check rules "$rule_file"; then
+                  echo "✅ $rule_file validation passed"
+                else
+                  echo "❌ $rule_file validation failed"
+                  rules_valid=false
+                fi
+              fi
+            done
+          else
+            echo "No rules directory found, skipping rule validation"
+          fi
+          
+          if [ "$rules_valid" = true ]; then
+            echo "rules_valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "rules_valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Validate Job Configurations
+        id: validate-jobs
+        run: |
+          echo "Validating job configurations..."
+          jobs_valid=true
+          
+          if [ -d "jobs" ]; then
+            # Check if job files are valid YAML
+            for job_file in jobs/*.yml jobs/*.yaml; do
+              if [ -f "$job_file" ]; then
+                echo "Checking YAML syntax for $job_file..."
+                if python3 -c "import yaml; yaml.safe_load(open('$job_file'))" 2>/dev/null; then
+                  echo "✅ $job_file YAML syntax is valid"
+                else
+                  echo "❌ $job_file YAML syntax is invalid"
+                  jobs_valid=false
+                fi
+              fi
+            done
+          else
+            echo "No jobs directory found, skipping job validation"
+          fi
+          
+          if [ "$jobs_valid" = true ]; then
+            echo "jobs_valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "jobs_valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Create validation summary
+        if: always()
+        run: |
+          echo "## 🔍 Prometheus Configuration Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.validate-main.outputs.main_config_valid }}" = "true" ]; then
+            echo "✅ **Main Configuration**: prometheus.yml is valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Main Configuration**: prometheus.yml has errors" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.validate-rules.outputs.rules_valid }}" = "true" ]; then
+            echo "✅ **Alert Rules**: All rule files are valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Alert Rules**: Some rule files have errors" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.validate-jobs.outputs.jobs_valid }}" = "true" ]; then
+            echo "✅ **Job Configurations**: All job files are valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Job Configurations**: Some job files have errors" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Validation Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: Pull Request #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.event.pull_request.head.sha }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR with results
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}  # Explicitly use the GitHub token
+          script: |
+            const mainValid = '${{ steps.validate-main.outputs.main_config_valid }}' === 'true';
+            const rulesValid = '${{ steps.validate-rules.outputs.rules_valid }}' === 'true';
+            const jobsValid = '${{ steps.validate-jobs.outputs.jobs_valid }}' === 'true';
+            
+            const allValid = mainValid && rulesValid && jobsValid;
+            
+            let body = '## 🔍 Prometheus Configuration Validation\n\n';
+            
+            body += `| Component | Status |\n`;
+            body += `|-----------|--------|\n`;
+            body += `| Main Config (prometheus.yml) | ${mainValid ? '✅ Valid' : '❌ Invalid'} |\n`;
+            body += `| Alert Rules | ${rulesValid ? '✅ Valid' : '❌ Invalid'} |\n`;
+            body += `| Job Configurations | ${jobsValid ? '✅ Valid' : '❌ Invalid'} |\n`;
+            
+            body += '\n';
+            
+            if (allValid) {
+              body += '🎉 **All configurations are valid!** This PR is ready for review.\n';
+            } else {
+              body += '⚠️ **Some configurations have validation errors.** Please check the workflow logs for details.\n';
+            }
+            
+            body += '\n---\n';
+            body += `*Validation performed on commit ${context.payload.pull_request.head.sha.substring(0, 7)}*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
